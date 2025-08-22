@@ -3,7 +3,8 @@
 
 <body onload="startTime()">
 
-<h2>JavaScript Clock</h2>
+<h1>ภูบดี เจียรนัยขจร ซาน เลขที่ 31</h1>
+<h2>ภูบดี เจียรนัยขจร ซาน เลขที่ 31</h2>
 
 <div id="txt"></div>
 
