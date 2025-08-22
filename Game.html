@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมปลาใต้ทะเลสุดสวย</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(180deg, #001e3c 0%, #003876 30%, #0066cc 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(180deg, 
+                rgba(0,150,255,0.3) 0%, 
+                rgba(0,100,200,0.5) 50%, 
+                rgba(0,50,100,0.7) 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background: transparent;
+        }
+
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-size: 18px;
+            background: rgba(0,0,0,0.7);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .start-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.6);
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-size: 24px;
+            background: rgba(0,0,0,0.8);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        .bubbles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .bubble {
+            position: absolute;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(173,216,230,0.4) 100%);
+            border-radius: 50%;
+            animation: float 8s infinite linear;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-10vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        .seaweed {
+            position: absolute;
+            bottom: 0;
+            width: 20px;
+            background: linear-gradient(180deg, #2d8f2d 0%, #1f5f1f 100%);
+            border-radius: 10px 10px 0 0;
+            animation: sway 4s infinite ease-in-out;
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="bubbles" id="bubbles"></div>
+        
+        <div class="ui">
+            <div>คะแนน: <span id="score">0</span></div>
+            <div>ชีวิต: <span id="lives">3</span> ❤️</div>
+        </div>
+
+        <div class="instructions" id="instructions">
+            <h2>🐠 เกมปลาใต้ทะเลสุดสวย 🐠</h2>
+            <p>ใช้เมาส์เพื่อควบคุมปลา</p>
+            <p>🟡 เก็บอาหารสีเหลือง = +10 คะแนน</p>
+            <p>🔴 หลีกเลี่ยงปลาฉลาม = -1 ชีวิต</p>
+            <p>💎 เพชรพิเศษ = +50 คะแนน</p>
+            <button class="start-btn" onclick="startGame()">เริ่มเกม</button>
+        </div>
+
+        <div class="game-over" id="gameOver">
+            <h2>เกมจบ!</h2>
+            <p>คะแนนรวม: <span id="finalScore">0</span></p>
+            <button class="start-btn" onclick="restartGame()">เล่นอีกครั้ง</button>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ปรับขนาด canvas
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // ตัวแปรเกม
+        let gameState = 'menu';
+        let score = 0;
+        let lives = 3;
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 30,
+            speed: 5,
+            angle: 0
+        };
+
+        let foods = [];
+        let enemies = [];
+        let gems = [];
+        let particles = [];
+
+        // สร้างพื้นหลังใต้น้ำ
+        function createSeaweed() {
+            for (let i = 0; i < 10; i++) {
+                const seaweed = document.createElement('div');
+                seaweed.className = 'seaweed';
+                seaweed.style.left = Math.random() * 100 + '%';
+                seaweed.style.height = (50 + Math.random() * 100) + 'px';
+                seaweed.style.animationDelay = Math.random() * 4 + 's';
+                document.querySelector('.game-container').appendChild(seaweed);
+            }
+        }
+
+        // สร้างฟองอากาศ
+        function createBubbles() {
+            const bubblesContainer = document.getElementById('bubbles');
+            setInterval(() => {
+                if (gameState === 'playing') {
+                    const bubble = document.createElement('div');
+                    bubble.className = 'bubble';
+                    bubble.style.left = Math.random() * 100 + '%';
+                    bubble.style.width = bubble.style.height = (10 + Math.random() * 30) + 'px';
+                    bubble.style.animationDuration = (5 + Math.random() * 5) + 's';
+                    bubblesContainer.appendChild(bubble);
+
+                    setTimeout(() => {
+                        if (bubble.parentNode) {
+                            bubble.parentNode.removeChild(bubble);
+                        }
+                    }, 8000);
+                }
+            }, 1000);
+        }
+
+        // วาดปลาผู้เล่น
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+
+            // เงาปลา
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(2, 2, player.size, player.size * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ตัวปลา
+            const gradient = ctx.createLinearGradient(-player.size, 0, player.size, 0);
+            gradient.addColorStop(0, '#ff6b6b');
+            gradient.addColorStop(0.5, '#ffa500');
+            gradient.addColorStop(1, '#ffeb3b');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, player.size, player.size * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ครีบ
+            ctx.fillStyle = '#ff4757';
+            ctx.beginPath();
+            ctx.ellipse(-player.size * 0.8, 0, player.size * 0.5, player.size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ตา
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(player.size * 0.3, -player.size * 0.2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(player.size * 0.4, -player.size * 0.2, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // วาดอาหาร
+        function drawFood(food) {
+            const gradient = ctx.createRadialGradient(food.x, food.y, 0, food.x, food.y, food.size);
+            gradient.addColorStop(0, '#ffeb3b');
+            gradient.addColorStop(0.7, '#ffc107');
+            gradient.addColorStop(1, '#ff8f00');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // เอฟเฟกต์เรืองแสง
+            ctx.shadowColor = '#ffeb3b';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = 'rgba(255,235,59,0.3)';
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, food.size + 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // วาดศัตรู (ปลาฉลาม)
+        function drawEnemy(enemy) {
+            ctx.save();
+            ctx.translate(enemy.x, enemy.y);
+            ctx.rotate(enemy.angle);
+
+            // เงา
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(2, 2, enemy.size, enemy.size * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ตัวฉลาม
+            const gradient = ctx.createLinearGradient(-enemy.size, 0, enemy.size, 0);
+            gradient.addColorStop(0, '#ff4757');
+            gradient.addColorStop(1, '#c44569');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, enemy.size, enemy.size * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ครีบและหาง
+            ctx.fillStyle = '#ff3742';
+            ctx.beginPath();
+            ctx.ellipse(-enemy.size * 0.9, 0, enemy.size * 0.6, enemy.size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ตา
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(enemy.size * 0.3, -enemy.size * 0.1, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ฟัน
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(enemy.size * 0.6 - i * 8, -5);
+                ctx.lineTo(enemy.size * 0.6 - i * 8 + 3, 0);
+                ctx.lineTo(enemy.size * 0.6 - i * 8 + 6, -5);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // วาดเพชร
+        function drawGem(gem) {
+            ctx.save();
+            ctx.translate(gem.x, gem.y);
+            ctx.rotate(gem.rotation);
+
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gem.size);
+            gradient.addColorStop(0, '#e91e63');
+            gradient.addColorStop(0.5, '#9c27b0');
+            gradient.addColorStop(1, '#673ab7');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(0, -gem.size);
+            ctx.lineTo(gem.size * 0.7, -gem.size * 0.3);
+            ctx.lineTo(gem.size * 0.7, gem.size * 0.3);
+            ctx.lineTo(0, gem.size);
+            ctx.lineTo(-gem.size * 0.7, gem.size * 0.3);
+            ctx.lineTo(-gem.size * 0.7, -gem.size * 0.3);
+            ctx.closePath();
+            ctx.fill();
+
+            // เอฟเฟกต์เรืองแสง
+            ctx.shadowColor = '#e91e63';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = 'rgba(233,30,99,0.3)';
+            ctx.beginPath();
+            ctx.arc(0, 0, gem.size + 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.restore();
+        }
+
+        // สร้างพาร์ติเคิล
+        function createParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    size: Math.random() * 5 + 2,
+                    color: color,
+                    life: 1,
+                    decay: 0.02
+                });
+            }
+        }
+
+        // วาดพาร์ติเคิล
+        function drawParticles() {
+            particles.forEach((particle, index) => {
+                ctx.save();
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life -= particle.decay;
+                particle.size *= 0.99;
+
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        // สร้างออบเจกต์ในเกม
+        function spawnFood() {
+            foods.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 8 + Math.random() * 5,
+                collected: false
+            });
+        }
+
+        function spawnEnemy() {
+            const side = Math.random() < 0.5 ? -1 : 1;
+            enemies.push({
+                x: side === 1 ? -50 : canvas.width + 50,
+                y: Math.random() * canvas.height,
+                size: 25 + Math.random() * 15,
+                speed: 1 + Math.random() * 2,
+                angle: side === 1 ? 0 : Math.PI,
+                direction: side
+            });
+        }
+
+        function spawnGem() {
+            gems.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 12,
+                rotation: 0,
+                collected: false
+            });
+        }
+
+        // การชน
+        function checkCollision(obj1, obj2) {
+            const dx = obj1.x - obj2.x;
+            const dy = obj1.y - obj2.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < obj1.size + obj2.size;
+        }
+
+        // อัพเดทเกม
+        function update() {
+            if (gameState !== 'playing') return;
+
+            // อัพเดทตำแหน่งศัตรู
+            enemies.forEach((enemy, index) => {
+                enemy.x += enemy.speed * enemy.direction;
+                
+                if (enemy.x < -100 || enemy.x > canvas.width + 100) {
+                    enemies.splice(index, 1);
+                }
+
+                if (checkCollision(player, enemy)) {
+                    lives--;
+                    createParticles(player.x, player.y, '#ff4757', 15);
+                    enemies.splice(index, 1);
+                    
+                    if (lives <= 0) {
+                        gameState = 'gameOver';
+                        document.getElementById('finalScore').textContent = score;
+                        document.getElementById('gameOver').style.display = 'block';
+                    }
+                }
+            });
+
+            // เช็คการเก็บอาหาร
+            foods.forEach((food, index) => {
+                if (checkCollision(player, food)) {
+                    score += 10;
+                    createParticles(food.x, food.y, '#ffeb3b', 8);
+                    foods.splice(index, 1);
+                }
+            });
+
+            // เช็คการเก็บเพชร
+            gems.forEach((gem, index) => {
+                gem.rotation += 0.1;
+                
+                if (checkCollision(player, gem)) {
+                    score += 50;
+                    createParticles(gem.x, gem.y, '#e91e63', 12);
+                    gems.splice(index, 1);
+                }
+            });
+
+            // อัพเดท UI
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+        }
+
+        // วาดทุกอย่าง
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'playing') {
+                foods.forEach(drawFood);
+                gems.forEach(drawGem);
+                enemies.forEach(drawEnemy);
+                drawPlayer();
+                drawParticles();
+            }
+        }
+
+        // ลูปเกม
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ควบคุมเมาส์
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameState === 'playing') {
+                const rect = canvas.getBoundingClientRect();
+                const targetX = e.clientX - rect.left;
+                const targetY = e.clientY - rect.top;
+
+                const dx = targetX - player.x;
+                const dy = targetY - player.y;
+                
+                player.x += dx * 0.1;
+                player.y += dy * 0.1;
+                
+                player.angle = Math.atan2(dy, dx);
+            }
+        });
+
+        // เริ่มเกม
+        function startGame() {
+            gameState = 'playing';
+            score = 0;
+            lives = 3;
+            foods = [];
+            enemies = [];
+            gems = [];
+            particles = [];
+            
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+
+            document.getElementById('instructions').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+
+            // สร้างออบเจกต์เริ่มต้น
+            for (let i = 0; i < 5; i++) {
+                spawnFood();
+            }
+
+            // ตั้งเวลาสร้างออบเจกต์
+            setInterval(() => {
+                if (gameState === 'playing') {
+                    if (Math.random() < 0.7) spawnFood();
+                    if (Math.random() < 0.3) spawnEnemy();
+                    if (Math.random() < 0.1) spawnGem();
+                }
+            }, 2000);
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        // เริ่มต้น
+        createSeaweed();
+        createBubbles();
+        gameLoop();
+
+        // ปรับขนาดเมื่อหน้าต่างเปลี่ยน
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
