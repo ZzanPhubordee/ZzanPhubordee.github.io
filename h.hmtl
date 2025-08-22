@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Space Shooter Mobile - เกมยิงปืนอวกาศ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(45deg, #0a0a2e, #16213e, #1a1a3a);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 400px;
+            max-height: 700px;
+            margin: 0 auto;
+            border: 2px solid #00ffff;
+            overflow: hidden;
+            box-shadow: 0 0 20px #00ffff;
+        }
+
+        #gameCanvas {
+            background: linear-gradient(180deg, #000428, #004e92);
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #00ffff;
+            font-size: 16px;
+            z-index: 100;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 150;
+        }
+
+        .movement-pad {
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .movement-stick {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 255, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            transition: all 0.1s ease;
+            box-shadow: 0 0 15px #00ffff;
+        }
+
+        .fire-button {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            border: 3px solid #ff6b6b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s ease;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+
+        .fire-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 30px rgba(255, 107, 107, 0.8);
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ff6b6b;
+            font-size: 20px;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ff6b6b;
+            display: none;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .restart-btn {
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .restart-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 20px #ff6b6b;
+        }
+
+        .pause-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                border: none;
+                box-shadow: none;
+                max-width: none;
+                max-height: none;
+            }
+            
+            .ui-overlay {
+                font-size: 14px;
+            }
+            
+            .movement-pad {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .movement-stick {
+                width: 35px;
+                height: 35px;
+            }
+            
+            .fire-button {
+                width: 70px;
+                height: 70px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="stars" id="stars"></div>
+        
+        <div class="ui-overlay">
+            <div>คะแนน: <span id="score">0</span></div>
+            <div>ชีวิต: <span id="lives">3</span></div>
+            <div>ระดับ: <span id="level">1</span></div>
+        </div>
+
+        <div class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸</div>
+
+        <div class="controls">
+            <div class="movement-pad" id="movementPad">
+                <div class="movement-stick" id="movementStick"></div>
+            </div>
+            <div class="fire-button" id="fireButton">🔥</div>
+        </div>
+
+        <div class="game-over" id="gameOver">
+            <h2>เกมจบแล้ว!</h2>
+            <p>คะแนนสุดท้าย: <span id="finalScore">0</span></p>
+            <button class="restart-btn" onclick="restartGame()">เล่นใหม่</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ปรับขนาด canvas ตามหน้าจอ
+        function resizeCanvas() {
+            const container = document.querySelector('.game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // สร้างดาวในพื้นหลัง
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = Math.random() * 2 + 1 + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // ตัวแปรเกม
+        let gameState = {
+            player: {
+                x: 0,
+                y: 0,
+                width: 40,
+                height: 40,
+                speed: 4,
+                color: '#00ffff'
+            },
+            bullets: [],
+            enemies: [],
+            particles: [],
+            score: 0,
+            lives: 3,
+            level: 1,
+            gameOver: false,
+            paused: false,
+            movement: { x: 0, y: 0 },
+            lastShot: 0,
+            shootDelay: 200
+        };
+
+        // เริ่มต้นตำแหน่งผู้เล่น
+        function initPlayer() {
+            gameState.player.x = canvas.width / 2 - gameState.player.width / 2;
+            gameState.player.y = canvas.height - 150;
+        }
+
+        // การจัดการ Virtual Joystick
+        const movementPad = document.getElementById('movementPad');
+        const movementStick = document.getElementById('movementStick');
+        let isDragging = false;
+        let padRect = null;
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            isDragging = true;
+            padRect = movementPad.getBoundingClientRect();
+            updateStickPosition(e.touches[0]);
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (isDragging) {
+                updateStickPosition(e.touches[0]);
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            isDragging = false;
+            gameState.movement = { x: 0, y: 0 };
+            movementStick.style.left = '50%';
+            movementStick.style.top = '50%';
+            movementStick.style.transform = 'translate(-50%, -50%)';
+        }
+
+        function updateStickPosition(touch) {
+            if (!padRect) return;
+            
+            const centerX = padRect.left + padRect.width / 2;
+            const centerY = padRect.top + padRect.height / 2;
+            const deltaX = touch.clientX - centerX;
+            const deltaY = touch.clientY - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = padRect.width / 2 - 20;
+            
+            if (distance <= maxDistance) {
+                movementStick.style.left = (50 + (deltaX / padRect.width) * 100) + '%';
+                movementStick.style.top = (50 + (deltaY / padRect.height) * 100) + '%';
+                
+                gameState.movement.x = deltaX / maxDistance;
+                gameState.movement.y = deltaY / maxDistance;
+            } else {
+                const angle = Math.atan2(deltaY, deltaX);
+                const x = Math.cos(angle) * maxDistance;
+                const y = Math.sin(angle) * maxDistance;
+                
+                movementStick.style.left = (50 + (x / padRect.width) * 100) + '%';
+                movementStick.style.top = (50 + (y / padRect.height) * 100) + '%';
+                
+                gameState.movement.x = Math.cos(angle);
+                gameState.movement.y = Math.sin(angle);
+            }
+        }
+
+        movementPad.addEventListener('touchstart', handleTouchStart);
+        movementPad.addEventListener('touchmove', handleTouchMove);
+        movementPad.addEventListener('touchend', handleTouchEnd);
+
+        // การยิง
+        const fireButton = document.getElementById('fireButton');
+        let isFireButtonPressed = false;
+
+        fireButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isFireButtonPressed = true;
+        });
+
+        fireButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isFireButtonPressed = false;
+        });
+
+        // ฟังก์ชันยิงกระสุน
+        function shoot() {
+            const now = Date.now();
+            if (now - gameState.lastShot < gameState.shootDelay) return;
+            
+            gameState.bullets.push({
+                x: gameState.player.x + gameState.player.width / 2 - 2,
+                y: gameState.player.y,
+                width: 4,
+                height: 12,
+                speed: 8,
+                color: '#ffff00'
+            });
+            
+            gameState.lastShot = now;
+        }
+
+        // สร้างศัตรู
+        function createEnemy() {
+            return {
+                x: Math.random() * (canvas.width - 35),
+                y: -35,
+                width: 35,
+                height: 35,
+                speed: 2 + Math.random() * 2 + gameState.level * 0.3,
+                color: `hsl(${Math.random() * 60 + 300}, 70%, 60%)`,
+                health: 1
+            };
+        }
+
+        // สร้างพาร์ติเคิล
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 6; i++) {
+                gameState.particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 25,
+                    maxLife: 25,
+                    color: color
+                });
+            }
+        }
+
+        // วาดผู้เล่น
+        function drawPlayer() {
+            const p = gameState.player;
+            
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.moveTo(p.x + p.width / 2, p.y);
+            ctx.lineTo(p.x + p.width * 0.8, p.y + p.height);
+            ctx.lineTo(p.x + p.width * 0.6, p.y + p.height * 0.8);
+            ctx.lineTo(p.x + p.width * 0.4, p.y + p.height * 0.8);
+            ctx.lineTo(p.x + p.width * 0.2, p.y + p.height);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawBullets() {
+            gameState.bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                
+                ctx.shadowColor = bullet.color;
+                ctx.shadowBlur = 4;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function drawEnemies() {
+            gameState.enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                ctx.shadowColor = enemy.color;
+                ctx.shadowBlur = 6;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function drawParticles() {
+            gameState.particles.forEach(particle => {
+                const alpha = particle.life / particle.maxLife;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function updatePlayer() {
+            const p = gameState.player;
+            
+            p.x += gameState.movement.x * p.speed;
+            p.y += gameState.movement.y * p.speed;
+            
+            // จำกัดการเคลื่อนที่ในหน้าจอ
+            p.x = Math.max(0, Math.min(canvas.width - p.width, p.x));
+            p.y = Math.max(0, Math.min(canvas.height - 200, p.y));
+        }
+
+        function updateBullets() {
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                bullet.y -= bullet.speed;
+                return bullet.y > -bullet.height;
+            });
+        }
+
+        function updateEnemies() {
+            if (Math.random() < 0.015 + gameState.level * 0.003) {
+                gameState.enemies.push(createEnemy());
+            }
+
+            gameState.enemies = gameState.enemies.filter(enemy => {
+                enemy.y += enemy.speed;
+                return enemy.y < canvas.height + enemy.height;
+            });
+        }
+
+        function updateParticles() {
+            gameState.particles = gameState.particles.filter(particle => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life--;
+                return particle.life > 0;
+            });
+        }
+
+        function checkCollisions() {
+            gameState.bullets.forEach((bullet, bulletIndex) => {
+                gameState.enemies.forEach((enemy, enemyIndex) => {
+                    if (bullet.x < enemy.x + enemy.width &&
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.y < enemy.y + enemy.height &&
+                        bullet.y + bullet.height > enemy.y) {
+                        
+                        createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.color);
+                        
+                        gameState.bullets.splice(bulletIndex, 1);
+                        gameState.enemies.splice(enemyIndex, 1);
+                        
+                        gameState.score += 100;
+                        
+                        if (gameState.score % 1000 === 0) {
+                            gameState.level++;
+                        }
+                    }
+                });
+            });
+
+            gameState.enemies.forEach((enemy, enemyIndex) => {
+                if (gameState.player.x < enemy.x + enemy.width &&
+                    gameState.player.x + gameState.player.width > enemy.x &&
+                    gameState.player.y < enemy.y + enemy.height &&
+                    gameState.player.y + gameState.player.height > enemy.y) {
+                    
+                    createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ff6b6b');
+                    
+                    gameState.enemies.splice(enemyIndex, 1);
+                    gameState.lives--;
+                    
+                    if (gameState.lives <= 0) {
+                        endGame();
+                    }
+                }
+            });
+        }
+
+        function endGame() {
+            gameState.gameOver = true;
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function restartGame() {
+            gameState = {
+                player: {
+                    x: 0,
+                    y: 0,
+                    width: 40,
+                    height: 40,
+                    speed: 4,
+                    color: '#00ffff'
+                },
+                bullets: [],
+                enemies: [],
+                particles: [],
+                score: 0,
+                lives: 3,
+                level: 1,
+                gameOver: false,
+                paused: false,
+                movement: { x: 0, y: 0 },
+                lastShot: 0,
+                shootDelay: 200
+            };
+            initPlayer();
+            document.getElementById('gameOver').style.display = 'none';
+        }
+
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            document.getElementById('pauseBtn').textContent = gameState.paused ? '▶' : '⏸';
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('lives').textContent = gameState.lives;
+            document.getElementById('level').textContent = gameState.level;
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!gameState.gameOver && !gameState.paused) {
+                if (isFireButtonPressed) {
+                    shoot();
+                }
+
+                updatePlayer();
+                updateBullets();
+                updateEnemies();
+                updateParticles();
+                checkCollisions();
+            }
+
+            drawPlayer();
+            drawBullets();
+            drawEnemies();
+            drawParticles();
+
+            updateUI();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // เริ่มเกม
+        createStars();
+        initPlayer();
+        gameLoop();
+
+        // ป้องกันการ scroll
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    </script>
+</body>
+</html>
